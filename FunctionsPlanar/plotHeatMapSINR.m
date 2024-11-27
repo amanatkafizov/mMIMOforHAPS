@@ -52,7 +52,7 @@ set(gca, 'YDir', 'normal');  % Fix the Y-axis direction
 
 % Color settings
 colorbar;                 % Show color scale
-%caxis([0, 30]);           % Set color scale limits
+caxis([0, 30]);           % Set color scale limits
 
 % Title and axis labels
 title(titleString);
@@ -62,7 +62,8 @@ axis equal;  % Keep the scale the same on both axes
 
 % Add contour overlay on the heatmap, skipping NaN values
 hold on;
-contour(x_grid_edges(1:end-1), y_grid_edges(1:end-1), avg_sinr_grid, 'LineColor', 'black', 'ShowText', 'on');
-
+contour(x_grid_edges(1:end-1), y_grid_edges(1:end-1), avg_sinr_grid, ...
+    'LineColor', 'black', 'ShowText', 'on', 'LevelList', 0:2.5:30);
+hold off;
     
 end

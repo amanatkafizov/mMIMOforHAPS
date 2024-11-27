@@ -3,14 +3,16 @@ clear all;
 close all;
 clc;
 
-cd 'C:/Users/kafizoa/Dropbox/mMIMO for HAPS/MatlabFiles/Functions'
+%cd 'C:/Users/kafizoa/Dropbox/mMIMO for HAPS/MatlabFiles/Functions'
+
+cd '/Users/kafizoa/Dropbox/mMIMO for HAPS/MatlabFiles/FunctionsCylindrical'
 
 % User Parameters
 Nu = 12; % Number of users per group to select
 R = 100e3; % Radius of the circular area (100 km)
-num_groups = 10; % Number of groups
-group_size = 1 * Nu; % Size of each group (10 x Nu users per group)
-alpha=0.2;
+num_groups = 1000; % Number of groups
+group_size = 10 * Nu; % Size of each group (10 x Nu users per group)
+alpha=0.4;
 P_t=150; %watt
 
 
@@ -28,12 +30,19 @@ fc=2.5e9;
 speed_light=3e8;
 bandwidth=18e6;
 lambda=speed_light/fc;
-Nh = 31;         % Number of horizontal elements on each circular array
-Nv = 6;          % Number of vertical circular arrays (stacks)
+Nh = 31;         % Number of horizontal elements on each circular array 31
+Nv = 6;          % Number of vertical circular arrays (stacks) 6
 Nb = 10;         % Number of bottom elements
 Nt=Nh*Nv+Nb; % total number of antenna elements on HAPS
 z_height=20000; % Height of the planar array in meters (z-component)
 
+
+
+ThetaNotTrans=zeros(num_groups * group_size,Nt);
+PhiNotTrans=zeros(num_groups * group_size,Nt);
+ThetaTrans=zeros(num_groups * group_size,Nt);
+PhiTrans=zeros(num_groups * group_size,Nt);
+G=zeros(num_groups * group_size,Nt);
 
 [antenna_array_positions, angle_circle]=compute_cylindrical_array_positions(lambda,Nh,Nv,Nb,z_height);
 
@@ -50,38 +59,31 @@ for group = 1:num_groups
     % Get user positions for this group
      group_users = all_users((group-1)*group_size + 1 : group*group_size, :);
      
+     D=zeros(size(group_users,1),Nt);
+     Theta=zeros(size(group_users,1),Nt);
+     Phi=zeros(size(group_users,1),Nt);
+     
      
      %Channel parameters for all antenna elements
-     [D,Theta,Phi]=cal_params_channel(antenna_array_positions,group_users);
+     [D(:,end-Nb+1:end),Theta(:,end-Nb+1:end)]=cal_params_channel_bottom_panel(antenna_array_positions(end-Nb+1:end,:),group_users,z_height);
+     [D(:,1:end-Nb),Theta(:,1:end-Nb)]=cal_params_channel_side_panel(antenna_array_positions(1:end-Nb,:),group_users,z_height);
      
-     
-      %instantiate a channel for a group user
-     H_group=zeros(size(D));
-     
-     % channel for the bottom part for the group selected 
-     % local to global transformation parameters for 3GGP radiation pattern
-      alpha_angleb=0;
-      beta_angleb=3*pi/2;
-      gamma_angleb=0;
-     H_group(:,end-Nb+1:end) = MIMOHAPSchannel(lambda,D(:,end-Nb+1:end),Theta(:,end-Nb+1:end),Phi(:,end-Nb+1:end), alpha_angleb, beta_angleb, gamma_angleb);
-     
-     % channel for the cylindrical surface part for the group selected 
-     for k=1:Nh
-       % local to global transformation parameters for 3GGP radiation pattern
-       alpha_anglec=angle_circle(k);
-       beta_anglec=0;
-       gamma_anglec=0;
-       H_group(:,k:Nh:end-Nb) = MIMOHAPSchannel(lambda,D(:,k:Nh:end-Nb),Theta(:,k:Nh:end-Nb),Phi(:,k:Nh:end-Nb), alpha_anglec, beta_anglec, gamma_anglec); 
-     end
-     
+     [H_group,G_group,ThetaTrans_group] = MIMOHAPSchannel(lambda,D,Theta);
+
 
      iterNu=0;
      while(iterNu<group_size)
-     
+%      ThetaNotTrans((group-1)*group_size +iterNu+ 1:(group-1)*group_size+iterNu+Nu,:)=rad2deg(Theta);
+%      PhiNotTrans((group-1)*group_size +iterNu+ 1:(group-1)*group_size+iterNu+Nu,:)=rad2deg(Phi);
+%      ThetaTrans((group-1)*group_size +iterNu+ 1:(group-1)*group_size+iterNu+Nu,:)=ThetaTrans_group;
+%      PhiTrans((group-1)*group_size +iterNu+ 1:(group-1)*group_size+iterNu+Nu,:)=RPhiTrans_group;   
+% 
+%      G((group-1)*group_size +iterNu+ 1:(group-1)*group_size+iterNu+Nu,:)=G_group;     
+         
      % Step 3: Apply the semi-orthogonal selection algorithm
      selected_indices = semi_orthogonal_selection(H_group, Nu, alpha);
      
-     H=H_group(selected_indices,:); %first select the channels of the corresponding selected Nu users
+      H=H_group(selected_indices,:); %first select the channels of the corresponding selected Nu users
      
      Sel_user_posittion=group_users(selected_indices,:); %positions of the corresponding selected Nu users
      
@@ -97,14 +99,11 @@ for group = 1:num_groups
      
      [SINR_sel_user, signal_power,singal_inter, signal_noise] = calculate_sinr(H, B_ZF, P_t, P_n); %SINR of selected users
      
-
-        
-     % Store the positions of the selected users and their SINR
-%      user_positions_and_SINR((group-1)*Nu +1:(group-1)*Nu+Nu, :) = [Sel_user_posittion SINR_sel_user];
-     
+     signal_powerAllUsers((group-1)*group_size +iterNu+ 1:(group-1)*group_size+iterNu+Nu, 1)=signal_power;
+     interference_powerAllUsers((group-1)*group_size +iterNu+ 1:(group-1)*group_size+iterNu+Nu, 1)=singal_inter;
      H_group(selected_indices, :) = [];  % Remove rows corresponding to selected users
      group_users(selected_indices, :) = [];  % Remove rows corresponding to selected users
-        
+%         
      % Store the positions of the selected users and their SINR
      user_positions_and_SINR((group-1)*group_size +iterNu+ 1:(group-1)*group_size+iterNu+Nu, :) = [Sel_user_posittion SINR_sel_user];
      
@@ -117,16 +116,24 @@ end
 %%
 Nfig=1;
 titleString='SINR heatmap for cylindrical antenna';
+%plotHeatMapSINR([user_positions_and_SINR(:,1:3) 10*log10(G(:,2))],R,Nfig,titleString)
 plotHeatMapSINR(user_positions_and_SINR,R,Nfig,titleString)
 %%
-% Plot the antenna array in 3D space
-figure;
-scatter3(antenna_array_positions(:,1), antenna_array_positions(:,2), antenna_array_positions(:,3), 'filled');
-hold on;
-scatter3(user_positions_and_SINR(:,1), user_positions_and_SINR(:,2), user_positions_and_SINR(:,3), 'filled');
-xlabel('X Position (m)');
-ylabel('Y Position (m)');
-zlabel('Z Position (m)');
-title('14x14 Planar Antenna Array in the XY Plane at Z = 20000m');
-axis equal;
-grid on;
+% plotCDF(user_positions_and_SINR(:,4)',5,'CDF of SINR for cylindrical antenna','SINR(dB)');
+% plotCDF(signal_powerAllUsers,6,'CDF of signal power for cylindrical antenna','Power (dB)');
+% plotCDF(interference_powerAllUsers,7,'CDF of interference power for cylindrical antenna','Power (dB)');
+%%
+%Plot the antenna array in 3D space
+%figure;
+% scatter3(antenna_array_positions(:,1), antenna_array_positions(:,2), antenna_array_positions(:,3), 'filled');
+% % hold on;
+% scatter3(user_positions_and_SINR(:,1), user_positions_and_SINR(:,2), user_positions_and_SINR(:,3), 'filled');
+% xlabel('X Position (m)');
+% ylabel('Y Position (m)');
+% zlabel('Z Position (m)');
+% title('14x14 Planar Antenna Array in the XY Plane at Z = 20000m');
+% axis equal;
+% grid on;
+%%
+% % cd '/Users/kafizoa/Dropbox/mMIMO for HAPS/MatlabFiles/Datasets'
+% % save('Cylindrical.mat')

@@ -29,8 +29,8 @@ function  [Resultgamma,Resultsignal,Resultinter,Resultnoise] = calculate_sinr(H,
         end
         
         % SINR calculation for user u
-        %gamma_u(u) = 10*log10(signal_power(u) / (P_n + interference_power(u)));
-        gamma_u(u) = 10*log10(signal_power(u) / (P_n));
+        gamma_u(u) = 10*log10(signal_power(u) / (P_n + interference_power(u)));
+        %gamma_u(u) = 10*log10(signal_power(u) / (P_n));
     end
     Resultsignal=10*log10(signal_power/1e-3);
     Resultinter=10*log10(interference_power/1e-3);
